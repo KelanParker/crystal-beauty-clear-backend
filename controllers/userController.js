@@ -1,6 +1,9 @@
 import User from "../models/user.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 export function saveUser(req, res) {
     // Check if user is logged in
@@ -62,7 +65,9 @@ export function loginUser(req, res) {
     };
 
 
-const token = jwt.sign(userData, "random123");
+const token = jwt.sign(userData, process.env.JWT_KEY, {
+        expiresIn: '1h' // Token will expire in 1 hour
+    });
     res.json({
         message: "Login successful",
         user: userData,
