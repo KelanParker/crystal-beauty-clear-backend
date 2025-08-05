@@ -3,12 +3,12 @@ import ProductModel from "../models/product.js";
 export function createProduct(req, res) {
     if(req.user == null) {
         return res.status(403).json({ message: 'You Need to Log in First' });
-        return;
+        
     }
 
     if(req.user.role !== 'admin') {
         return res.status(403).json({ message: 'You are not authorized to create products' });
-        return;
+
     }
 
     const product = new ProductModel(req.body);
@@ -17,8 +17,10 @@ export function createProduct(req, res) {
             res.status(201).json({ message: "Product created successfully", product });
         })
         .catch((error) => {
-            res.status(500).json({ message: "Error creating product", error });
-        });
+    console.error("Product creation failed:", error.message); // helpful!
+    res.status(500).json({ message: "Error creating product", error: error.message });
+});
+
 
 }
 
@@ -33,14 +35,15 @@ export function getProducts(req, res) {
 }
 
 export function deleteProduct(req, res) {
+    console.log("User:", req.user);
+    console.log("Deleting Product ID:", req.params.productID);
+
     if(req.user == null) {
         return res.status(403).json({ message: 'You Need to Log in First' });
-        return;
     }
 
     if(req.user.role !== 'admin') {
         return res.status(403).json({ message: 'You are not authorized to delete products' });
-        return;
     }
 
     ProductModel.findOneAndDelete({ productID: req.params.productID })
@@ -51,7 +54,8 @@ export function deleteProduct(req, res) {
             res.status(200).json({ message: "Product deleted successfully", product });
         })
         .catch((error) => {
-            res.status(500).json({ message: "Error deleting product", error });
+            console.error("Backend Deletion Error:", error);
+            res.status(500).json({ message: "Error deleting product", error: error.message });
         });
 }
 
@@ -59,12 +63,10 @@ export function deleteProduct(req, res) {
 export function updateProduct(req, res) {
     if(req.user == null) {
         return res.status(403).json({ message: 'You Need to Log in First' });
-        return;
     }
 
     if(req.user.role !== 'admin') {
         return res.status(403).json({ message: 'You are not authorized to update products' });
-        return;
     }
 
     ProductModel.findOneAndUpdate({ productID: req.params.productID }, req.body, { new: true })
