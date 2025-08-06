@@ -8,7 +8,6 @@ import orderRouter from './routes/orderRouter.js';
 import dotenv from 'dotenv';
 import cors from 'cors';
 
-
 let app = express();
 
 dotenv.config();
@@ -24,14 +23,14 @@ mongoose.connect(process.env.MONGO_URL)
     console.error('MongoDB connection error');
   });
 
-
-
 app.use(bodyParser.json());
-app.use(verifyJWT);
 
+// ✅ Public routes (no JWT required)
 app.use('/api/users', userRouter);
-app.use('/api/products', productRouter);
-app.use('/api/order', orderRouter);
+
+// ✅ Protected routes (JWT required)
+app.use('/api/products', verifyJWT, productRouter);
+app.use('/api/order', verifyJWT, orderRouter);
 
 app.listen(5000, () => {
     console.log('server started on port 5000');
