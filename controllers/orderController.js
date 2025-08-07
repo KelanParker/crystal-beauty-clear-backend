@@ -8,15 +8,33 @@ export async function createOrder(req, res) {
 
     const body = req.body;
 
+    // Validate required fields in the request body
+    const requiredFields = ['address', 'phone', 'billItems'];
+    for (let i = 0; i < requiredFields.length; i++) {
+        const field = requiredFields[i];
+        if (!body[field]) {
+            return res.status(400).json({ 
+                message: `Missing required field: ${field}` 
+            });
+        }
+    }
+
+    // Validate billItems is an array and not empty
+    if (!Array.isArray(body.billItems) || body.billItems.length === 0) {
+        return res.status(400).json({ 
+            message: 'billItems must be a non-empty array' 
+        });
+    }
+
     const orderData = {
         orderId: "",
         email: req.user.email,
-        name: `${req.user.firstName} ${req.user.lastName}`,  // ✅ Fix is here
+        name: `${req.user.firstName} ${req.user.lastName}`,
         address: body.address,
         phone: body.phone,
-        status: body.status,
+        status: body.status || "pending", // Default status if not provided
         billItems:[],
-        total: body.total
+        total: 0 // Will be calculated later
     };
 
 
@@ -33,20 +51,64 @@ export async function createOrder(req, res) {
             orderData.orderId = "ORD-" + String(newOrderId).padStart(4, "0");
         }
 
+        // Validate all bill items and check if products exist in database
+        let calculatedTotal = 0;
+        
         for (let i = 0; i < body.billItems.length; i++) {
             const item = body.billItems[i];
-            const product = await ProductModel.findById(item.productId); // Check if product exists
-
-            if (!product) {
-            return res.status(400).json({ message: `Product with ID ${item.productId} does not exist.` });
+            
+            // Check if required fields are present in the request
+            if (!item.productID || !item.quantity) {
+                return res.status(400).json({ 
+                    message: `Missing required fields for item ${i + 1}. ProductID and quantity are required.` 
+                });
             }
 
+            // Validate quantity is a positive number
+            if (item.quantity <= 0) {
+                return res.status(400).json({ 
+                    message: `Invalid quantity for item ${i + 1}. Quantity must be positive.` 
+                });
+            }
+
+            // Check if product exists in database using productID
+            const product = await ProductModel.findOne({ productID: item.productID });
+            if (!product) {
+                return res.status(400).json({ 
+                    message: `Product with ID ${item.productID} does not exist in our database.` 
+                });
+            }
+
+            // Check if product is available
+            if (!product.isAvailable) {
+                return res.status(400).json({ 
+                    message: `Product '${product.name}' is currently not available for purchase.` 
+                });
+            }
+
+            // Validate if requested quantity is available
+            if (product.stock < item.quantity) {
+                return res.status(400).json({ 
+                    message: `Insufficient stock for product '${product.name}'. Available: ${product.stock}, Requested: ${item.quantity}` 
+                });
+            }
+
+            // Use the product's actual price (not from request to prevent price manipulation)
+            const itemPrice = product.price;
+            const itemTotal = itemPrice * item.quantity;
+            calculatedTotal += itemTotal;
+
             orderData.billItems.push({
-                productId: item.productId,
+                productId: product._id, // Store MongoDB ObjectId
                 quantity: item.quantity,
-                price: item.price
+                price: itemPrice,
+                productName: product.name,
+                productImage: product.imageUrl[0] || "" // First image if available
             });
         }
+
+        // Set the calculated total
+        orderData.total = calculatedTotal;
 
 
         // Save the order
